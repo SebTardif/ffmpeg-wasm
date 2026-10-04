@@ -1,3 +1,5 @@
+import { isCurrentSource, resultForCurrentSource } from "./current-source.js";
+
 type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png" | "video-mp4";
 export type WorkbenchOperation = Operation;
 type StatusMode = "busy" | "error" | "idle";
@@ -385,10 +387,18 @@ async function setSourceFile(file: File) {
   updateCommand();
   setStatus("Probing", "busy");
   try {
-    state.probe = await probeFile(file);
-    updateSourceMetrics(file, state.probe);
+    const probed = await probeFile(file);
+    const current = resultForCurrentSource(file, state.file, probed);
+    if (current === null) {
+      return;
+    }
+    state.probe = current;
+    updateSourceMetrics(file, current);
     setStatus("Ready", "idle");
   } catch (error) {
+    if (!isCurrentSource(file, state.file)) {
+      return;
+    }
     setStatus(errorMessage(error), "error");
   }
 }
@@ -440,23 +450,36 @@ async function renderOutput(saveAfterRender: boolean) {
     }
   }
 
+  const source = state.file;
+  if (source === null) {
+    setStatus("Load media first", "error");
+    return;
+  }
+
   setStatus("Rendering", "busy");
   showProgress("Preparing ffmpac", null);
   elements.renderButton.disabled = true;
   elements.renderSaveButton.disabled = true;
   try {
     const rendered = await renderWithBackend();
-    setLastOutput(rendered);
+    const fresh = resultForCurrentSource(source, state.file, rendered);
+    if (fresh === null) {
+      return;
+    }
+    setLastOutput(fresh);
     if (saveHandle !== null) {
-      await writeBlobToHandle(saveHandle, rendered.blob);
+      await writeBlobToHandle(saveHandle, fresh.blob);
       setStatus("Saved", "idle");
     } else if (saveAfterRender) {
-      downloadBlob(rendered.blob, rendered.name);
+      downloadBlob(fresh.blob, fresh.name);
       setStatus("Downloaded", "idle");
     } else {
       setStatus("Rendered", "idle");
     }
   } catch (error) {
+    if (!isCurrentSource(source, state.file)) {
+      return;
+    }
     setStatus(errorMessage(error), "error");
   } finally {
     hideProgress();
