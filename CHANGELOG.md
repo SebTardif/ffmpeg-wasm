@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ignore browser render progress from a replaced source so the new file is not left marked busy.
+
 ## 0.1.1 - 2026-09-24
 
 **Highlights:** Reliable large outputs and subprocess cleanup, lower memory retention in the workbench, and refreshed FFmpeg and Emscripten patch releases with the same Node 24+ runtime requirement.

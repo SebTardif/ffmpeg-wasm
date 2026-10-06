@@ -1,4 +1,8 @@
-import { isCurrentSource, resultForCurrentSource } from "./current-source.js";
+import {
+  isCurrentSource,
+  resultForCurrentSource,
+  statusForRenderProgress,
+} from "./current-source.js";
 
 type Operation = "audio-mp3" | "audio-wav" | "clip-mp4" | "hash-raw" | "poster-png" | "video-mp4";
 export type WorkbenchOperation = Operation;
@@ -734,7 +738,7 @@ async function renderWithBrowserFfmpac(file: File): Promise<RenderOutput> {
   const result = await runBrowserTool("ffmpeg", {
     args: progressArgs(args),
     inputPath,
-    onProgress: renderProgressHandler(progressDurationSeconds(operation, args)),
+    onProgress: renderProgressHandler(file, progressDurationSeconds(operation, args)),
     outputPath,
     source: file,
   });
@@ -862,11 +866,17 @@ function progressArgs(args: string[]) {
   return ["-progress", "pipe:2", "-nostats", ...args];
 }
 
-function renderProgressHandler(durationSeconds: number | null) {
+function renderProgressHandler(source: File, durationSeconds: number | null) {
   return (progress: BrowserToolProgress) => {
+    if (!isCurrentSource(source, state.file)) {
+      return;
+    }
+    const status = statusForRenderProgress(source, state.file, progress, durationSeconds);
     if (progress.phase === "end") {
       showProgress("Finalizing output", 1);
-      setStatus("Rendering 100%", "busy");
+      if (status !== null) {
+        setStatus(status, "busy");
+      }
       return;
     }
     const ratio =
@@ -884,8 +894,8 @@ function renderProgressHandler(durationSeconds: number | null) {
       detailParts.push(`speed ${progress.speed}`);
     }
     showProgress(detailParts.join(" · ") || "ffmpac is working", ratio);
-    if (ratio !== null) {
-      setStatus(`Rendering ${Math.round(ratio * 100)}%`, "busy");
+    if (status !== null) {
+      setStatus(status, "busy");
     }
   };
 }
