@@ -377,6 +377,9 @@ async function setSourceFile(file: File) {
     URL.revokeObjectURL(state.lastOutput.url);
   }
   state.lastOutput = null;
+  hideProgress();
+  // oxlint-disable-next-line no-underscore-dangle -- Stable browser E2E test hook.
+  delete browserGlobal.__lastRender;
   if (state.inputUrl !== null) {
     URL.revokeObjectURL(state.inputUrl);
   }
@@ -431,7 +434,8 @@ async function probeFile(file: File): Promise<ProbeResult> {
 }
 
 async function renderOutput(saveAfterRender: boolean) {
-  if (state.file === null) {
+  const source = state.file;
+  if (source === null) {
     setStatus("Load media first", "error");
     return;
   }
@@ -446,6 +450,9 @@ async function renderOutput(saveAfterRender: boolean) {
     try {
       saveHandle = await showSaveFilePicker(savePickerOptions(null));
     } catch (error) {
+      if (!isCurrentSource(source, state.file)) {
+        return;
+      }
       if (error instanceof DOMException && error.name === "AbortError") {
         setStatus("Save canceled", "idle");
         return;
@@ -454,9 +461,7 @@ async function renderOutput(saveAfterRender: boolean) {
     }
   }
 
-  const source = state.file;
-  if (source === null) {
-    setStatus("Load media first", "error");
+  if (!isCurrentSource(source, state.file)) {
     return;
   }
 
@@ -473,7 +478,9 @@ async function renderOutput(saveAfterRender: boolean) {
     setLastOutput(fresh);
     if (saveHandle !== null) {
       await writeBlobToHandle(saveHandle, fresh.blob);
-      setStatus("Saved", "idle");
+      if (isCurrentSource(source, state.file)) {
+        setStatus("Saved", "idle");
+      }
     } else if (saveAfterRender) {
       downloadBlob(fresh.blob, fresh.name);
       setStatus("Downloaded", "idle");

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Ignore browser render progress from a replaced source so the new file is not left marked busy.
+- Ignore probe results, render output, progress, and save status from a replaced source, keeping the newly selected file's state intact in both workbench backends. Thanks @SebTardif.
 
 ## 0.1.1 - 2026-09-24
 
